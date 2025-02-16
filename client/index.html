@@ -435,7 +435,7 @@
                 position: { left: '50%', top: '50%' },
                 color: 'red',
                 size: motorSize,
-                restJoystick: false,
+                restJoystick: true,
                 lockX: false,
                 lockY: true
             });
@@ -455,6 +455,10 @@
                     let motorValue = document.getElementById("motorValue");
                     motorValue.value = 0;
                 }
+            });
+
+            joystickMotor.on('end', function (evt, data) {
+              motorValue.value = 0;
             });
 
             document.getElementById("joy1OnOff").addEventListener("change", function(e) {

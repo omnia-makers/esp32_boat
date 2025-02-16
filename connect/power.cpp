@@ -32,16 +32,14 @@ void setOffMotorPower(void) {
 // Sets the motor to a given duty value (-255 to 255).
 void setDutyMotorPower(int duty) {
     if (duty < 0) {
-        //int speed = map(-duty, 0, 254, 30, 235);
-        int speed = map(-duty, 0, 200, 30, 200);
+        int speed = map(-duty, 0, 254, 30, 235);
         analogWrite(motorPin1, speed);  // Forward speed (0-255)
         analogWrite(motorPin2, 0);
         Serial.print("Motor moving BACKWARD with duty cycle: ");
         Serial.println(speed);
     } 
     else if (duty > 0) {
-        //int speed = map(duty, 0, 254, 30, 235);
-        int speed = map(duty, 0, 200, 30, 200);
+        int speed = map(duty, 0, 254, 30, 235);
         analogWrite(motorPin2, speed);  // Reverse speed (0-255)
         analogWrite(motorPin1, 0);
         
