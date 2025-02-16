@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>NippleJS</title>
+        <meta name="viewport" content="width=device-width, initial-scale=0.5, maximum-scale=0.5">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+        <style>
+        html, body {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        body.connected .connect-wp, body.connecting .connect-wp {
+            display: none !important;
+        }
+
+        #connect {
+            width: 100px;
+            height: 100px;
+            text-align: center;
+        }
+
+        #left {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 35%;
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        #right {
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            width: 35%;
+            background: rgba(0, 0, 255, 0.1);
+        }
+
+        #center {
+            position: absolute;
+            padding: 100px;
+            left:35%;
+            height: 100%;
+            width: 30%;
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        #log {
+            max-height: 150px
+        }
+
+        .slidecontainer {
+        width: 100%; /* Width of the outside container */
+        }
+
+        /* The slider itself */
+        .slider {
+        -webkit-appearance: none;  /* Override default CSS styles */
+        appearance: none;
+        width: 100%; /* Full-width */
+        height: 25px; /* Specified height */
+        background: #d3d3d3; /* Grey background */
+        outline: none; /* Remove outline */
+        opacity: 0.7; /* Set transparency (for mouse-over effects on hover) */
+        -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+        transition: opacity .2s;
+        }
+
+        /* Mouse-over effects */
+        .slider:hover {
+        opacity: 1; /* Fully shown on mouse-over */
+        }
+
+        /* The slider handle (use -webkit- (Chrome, Opera, Safari, Edge) and -moz- (Firefox) to override default look) */
+        .slider::-webkit-slider-thumb {
+        -webkit-appearance: none; /* Override default look */
+        appearance: none;
+        width: 25px; /* Set a specific slider handle width */
+        height: 25px; /* Slider handle height */
+        background: #04AA6D; /* Green background */
+        cursor: pointer; /* Cursor on hover */
+        }
+
+        .slider::-moz-range-thumb {
+        width: 25px; /* Set a specific slider handle width */
+        height: 25px; /* Slider handle height */
+        background: #04AA6D; /* Green background */
+        cursor: pointer; /* Cursor on hover */
+        }
+        </style>
+    </head>
+    <body class="disconnected">
+        <script>
+            const service_uuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+            const characteristic_uuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+            const reconnect_max_tries = 3;
+            const reconnect_delay = 5;
+            const joyCommandDebounce = 300;
+
+            let bluetoothDevice;
+            let bluetoothServer;
+            let bluetoothService;
+            let bluetoothCharacteristic;
+
+            const encoder = new TextEncoder('utf-8');
+
+            var Titanic = {
+              log: function () {
+                var logContainer = document.querySelector('#log');
+                var line = Array.prototype.slice.call(arguments).map(function (argument) {
+                  return typeof argument === 'string' ? argument : JSON.stringify(argument);
+                }).join(' ');
+                logContainer.textContent += line + '\n';
+                logContainer.scrollTop = logContainer.scrollHeight;
+              },
+
+              clearLog: function () {
+                document.querySelector('#log').textContent = '';
+              },
+              setStatus: function (status, type) {
+                document.querySelector('#status').textContent = status;
+                // Clear existing alert classes
+                document.querySelector('#status').className = '';
+                document.querySelector('#status').classList.add('alert', 'alert-' + type);
+              }
+            };
+
+            let log = Titanic.log;
+
+            function onButtonClick() {
+              // Optionally clear previous log messages:
+              Titanic.clearLog();
+
+              log('Requesting a Bluetooth Device...');
+              navigator.bluetooth.requestDevice({
+                // Better to filter by known service if possible:
+                // filters: [{ services: [service_uuid] }]
+                acceptAllDevices: true,
+                optionalServices: [service_uuid]
+              })
+              .then(device => {
+                console.log('Device found:', device.name);
+                log('Device selected: ' + device.name);
+
+                bluetoothDevice = device;
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+                // Initiate the connection logic
+                connect();
+              })
+              .catch(error => {
+                console.error('Error during requestDevice:', error);
+                log('Argh! ' + error);
+              });
+            }
+
+            function connect() {
+              // If the device is already connected, skip straight to init:
+              if (bluetoothDevice && bluetoothDevice.gatt && bluetoothDevice.gatt.connected) {
+                log('> Already connected. Initializing services/characteristics...');
+                init(bluetoothDevice.gatt.server);
+                return;
+              }
+
+              // Otherwise, try to connect with exponential backoff:
+              exponentialBackoff(
+                reconnect_max_tries,
+                reconnect_delay,
+                () => {
+                  document.body.classList.remove('connected', 'disconnected');
+                  document.body.classList.add('connecting');
+                  Titanic.setStatus('Connecting...', 'info');
+                  time('Connecting to device... ');
+
+                  return bluetoothDevice.gatt.connect();
+                },
+                server => {
+                  // On success
+                  document.body.classList.remove('connecting', 'disconnected');
+                  document.body.classList.add('connected');
+                  Titanic.setStatus('Connected', 'info');
+                  log('> Device connected.');
+
+                  init(server);
+                  return server;
+                },
+                error => {
+                  // On fail
+                  document.body.classList.remove('connecting', 'connected');
+                  document.body.classList.add('disconnected');
+                  Titanic.setStatus('Disconnected', 'warning');
+                  time('Failed to reconnect: ' + error);
+                  return null;
+                }
+              );
+            }
+
+            function init(server) {
+              bluetoothServer = server;
+              log('> Trying to init notifications...');
+
+              // If for some reason we got here but the server is not connected, try to reconnect:
+              if (!server.connected) {
+                log('> Server is disconnected, attempting reconnect...');
+                server.device.gatt.connect()
+                  .then(newServer => init(newServer))
+                  .catch(err => {
+                    log('> Reconnection failed: ' + err);
+                  });
+                return;
+              }
+
+              server.getPrimaryService(service_uuid)
+                .then(service => {
+                  bluetoothService = service;
+                  log('>> Service found!');
+                  return service.getCharacteristic(characteristic_uuid);
+                })
+                .then(characteristic => {
+                  log('>> Characteristic found!');
+                  return characteristic.startNotifications();
+                })
+                .then(characteristic => {
+                  bluetoothCharacteristic = characteristic;
+                  Titanic.setStatus('Connected & ready', 'success');
+                  log('> Notifications are now active!');
+                })
+                .catch(error => {
+                  // If anything fails in the above chain, reset references:
+                  bluetoothServer = null;
+                  bluetoothService = null;
+                  bluetoothCharacteristic = null;
+                  log('> Init failed! ' + error);
+                });
+            }
+
+            function onDisconnected() {
+              document.body.classList.remove('connecting', 'connected');
+              document.body.classList.add('disconnected');
+              log('> Bluetooth Device disconnected');
+              Titanic.setStatus('Disconnected', 'warning');
+
+              bluetoothServer = null;
+              bluetoothService = null;
+              bluetoothCharacteristic = null;
+
+              // Attempt to reconnect automatically:
+              connect();
+            }
+
+            /* Utils */
+
+            // Repeatedly calls "toTry" until it resolves or we exhaust "max" attempts.
+            function exponentialBackoff(max, delay, toTry, success, fail) {
+              toTry()
+                .then(result => success(result))
+                .catch(_ => {
+                  if (max === 0) {
+                    return fail();
+                  }
+                  time('Retrying in ' + delay + 's... (' + max + ' tries left)');
+                  setTimeout(() => {
+                    exponentialBackoff(--max, delay * 2, toTry, success, fail);
+                  }, delay * 1000);
+                });
+            }
+
+            function time(text) {
+              log('[' + new Date().toJSON().substr(11, 8) + '] ' + text);
+            }
+
+            // Example usage check
+            function isWebBluetoothEnabled() {
+              if (navigator.bluetooth) {
+                return true;
+              } else {
+                Titanic.setStatus(
+                  'Web Bluetooth API not available.\n' +
+                  'Please make sure "Experimental Web Platform features" is enabled.',
+                  'warning'
+                );
+                return false;
+              }
+            }
+          </script>
+        <div class="connect-wp position-fixed top-0 start-0 w-100 h-100 bg-light bg-opacity-75 z-3">
+            <button id="connect" onclick="onButtonClick();" class="btn btn-primary rounded-circle shadow position-absolute top-50 start-50 translate-middle">Connect</button>
+        </div>
+
+        <div id="left"></div>
+        <div id="center">
+            <form class="row g-3 align-items-center mb-4" id="joyHell">
+                <div class="col-6">
+                    <div class="input-group">
+                        <div class="input-group-text">Timón Max.</div>
+                        <input type="range" min="50" max="254" value="254" class="slider w-100" id="timonValorMaximo">
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="input-group">
+                        <div class="input-group-text">Motor Max.</div>
+                        <input type="range" min="50" max="254" value="254" class="slider w-100" id="motorValorMaximo">
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="input-group">
+                        <div class="input-group-text">X</div>
+                        <input id="timonValue" type="text" class="form-control" value="0"/>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="input-group">
+                        <div class="input-group-text">Y</div>
+                        <input id="motorValue" type="text" class="form-control" value="0"/>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="joy1OnOff">
+                        <label class="form-check-label" for="joy1OnOff">ON / OFF</label>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="timonReverse">
+                        <label class="form-check-label" for="timonReverse">Invertir Timon</label>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="motorReverse">
+                        <label class="form-check-label" for="motorReverse">Invertir Dirección</label>
+                    </div>
+                </div>
+            </form>
+
+            <form onsubmit="send(); return false;" class="mb-5">
+                <div class="input-group">
+                    <input type="text" id="command" class="form-control" placeholder="Command" aria-label="Command"
+                           aria-describedby="button-addon2">
+                    <input type="submit" class="btn btn-secondary" value="Send">
+                </div>
+            </form>
+
+            <div id="output" class="output position-fixed bottom-0 start-50 translate-middle-x z-3 mb-3">
+                <pre id="log" class="output-log mb-3 bg-dark bg-opacity-50 p-3 rounded text-white"></pre>
+                <div class="text-center">
+                    <div id="status" class="alert alert-warning">Disconnected</div>
+                </div>
+            </div>
+        </div>
+        <div id="right"></div>
+        <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.10.2/dist/nipplejs.min.js"></script>
+        <script>
+            let commandDelay = 250;
+            /****************************************
+             * JOYSTICK TIMON
+             ****************************************/
+            let timonSize = 300;
+            let timonMaxLimit = 254;
+
+            let convertJoystickTimonValue = function (value) {
+                let timonReversChecked = document.getElementById("timonReverse");
+                let timonReverse = timonReversChecked.checked ? -1 : 1;
+                return Math.round((timonMaxLimit*value)*timonReverse);
+            };
+
+            let sendCommand = function (data) {
+                if (!bluetoothCharacteristic) {
+                    //log("Device not connected. Command not sent.");
+                    return false;
+                }
+                let timonValue = document.getElementById("timonValue");
+                let motorValue = document.getElementById("motorValue");
+                let command = "x" + timonValue.value + " y" + motorValue.value;
+
+                log('Command sent: ' + command);
+                bluetoothCharacteristic.writeValueWithoutResponse(encoder.encode(command + "\r\n"))
+
+                return false;
+            };
+
+            let joystickTimon = nipplejs.create({
+                zone: document.getElementById('right'),
+                mode: 'dynamic',
+                position: { left: '50%', top: '50%' },
+                color: 'green',
+                size: timonSize,
+                restJoystick: true,
+                lockX: true,
+                lockY: false
+            });
+
+            let timonValorMaximo = document.getElementById("timonValorMaximo");
+            timonValorMaximo.addEventListener("change", function() {
+                timonMaxLimit = this.value;
+            });
+
+            joystickTimon.on('move', function (evt, data) {
+                let timonValue = document.getElementById("timonValue");
+                timonValue.value = convertJoystickTimonValue(data.vector.x);
+                // sendCommand();
+            });
+
+            joystickTimon.on('end', function (evt, data) {
+                timonValue.value = 0;
+            });
+
+            /****************************************
+             * JOYSTICK MOTOR
+             ****************************************/
+            let motorSize = 300;
+            let motorMaxLimit = 254;
+
+            let convertJoystickMotorValue = function (value) {
+                let motorReversChecked = document.getElementById("motorReverse");
+                let motorReverse = motorReversChecked.checked ? -1 : 1;
+                return Math.round((motorMaxLimit*value)*motorReverse);
+            };
+
+            let joystickMotor = nipplejs.create({
+                zone: document.getElementById('left'),
+                mode: 'dynamic',
+                position: { left: '50%', top: '50%' },
+                color: 'red',
+                size: motorSize,
+                restJoystick: false,
+                lockX: false,
+                lockY: true
+            });
+
+            let motorValorMaximo = document.getElementById("motorValorMaximo");
+            motorValorMaximo.addEventListener("change", function() {
+                motorMaxLimit = this.value;
+            });
+
+            joystickMotor.on('move', function (evt, data) {
+                let motorOn = document.getElementById("joy1OnOff");
+                if (motorOn.checked) {
+                    let motorValue = document.getElementById("motorValue");
+                    motorValue.value = convertJoystickMotorValue(data.vector.y);
+                    // sendCommand();
+                } else {
+                    let motorValue = document.getElementById("motorValue");
+                    motorValue.value = 0;
+                }
+            });
+
+            document.getElementById("joy1OnOff").addEventListener("change", function(e) {
+
+                command = e.target.checked ? 'on' : 'off';
+                log('Command sent: ' + command);
+                bluetoothCharacteristic.writeValueWithoutResponse(encoder.encode(command + "\r\n"));
+
+            });
+
+
+            let intervalId = setInterval(() => {
+                sendCommand();
+            }, commandDelay);
+
+        </script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+        crossorigin="anonymous"></script>
+    </body>
+</html>
