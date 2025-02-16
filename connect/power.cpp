@@ -4,8 +4,12 @@
 #include <Arduino.h>  // Ensure Arduino functions are available
 
 // Motor control pins
-const int motorPin1 = 27;  // H-Bridge IN1
-const int motorPin2 = 26;  // H-Bridge IN2
+//const int motorPin1 = 27;  // H-Bridge IN1
+//const int motorPin2 = 26;  // H-Bridge IN2
+
+// ESP32Mini
+const int motorPin1 = 0;  // H-Bridge IN1
+const int motorPin2 = 10;  // H-Bridge IN2
 
 // Función map
 int map(int x, int in_min, int in_max, int out_min, int out_max)
