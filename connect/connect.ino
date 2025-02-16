@@ -1,7 +1,10 @@
+#include <Arduino.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
+#include <DataParser.h>
+#include <servo.h>
 
 // UUID definitions (using 16-bit UUIDs)
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
@@ -10,14 +13,6 @@
 
 // Global pointer to our characteristic (so descriptor callbacks can access it)
 BLECharacteristic *pCharacteristic = nullptr;
-
-// Forward declaration of a user function to parse incoming data
-void parseDataComunication(const char *data) {
-  Serial.print("Parsing data: ");
-  Serial.println(data);
-  // Add your parsing logic here
-}
-
 
 /*=========================================================================
    Server Callbacks
@@ -145,6 +140,7 @@ void setup() {
   Serial.println(SERVICE_UUID);
   Serial.print("Characteristic UUID: ");
   Serial.println(CHARACTERISTIC_UUID);
+  servoInit();
 }
 
 void loop() {
