@@ -1,5 +1,7 @@
 # ESP32 BLE Motor and Servo Control
 
+Project supported by [Metadrop](https://metadrop.net/) and [Omnia Makers](https://omnia-makers.github.io/)
+
 ## Overview
 This project is designed to control a motor and a servo using an ESP32 with Bluetooth Low Energy (BLE) communication. The ESP32 interacts with an L298N H-Bridge motor driver and a servo motor based on received BLE commands.
 
