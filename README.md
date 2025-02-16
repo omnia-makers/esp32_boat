@@ -68,7 +68,7 @@ Change motorPin1 and motorPin2 on power.cpp if use ESP32 or ESP32Mini
   - **Service UUID**: `4fafc201-1fb5-459e-8fcc-c5c9c331914b`
   - **Characteristic UUID**: `beb5483e-36e1-4688-b7f5-ea07361b26a8`
   - **DEVICE_NAME**: `METALANCHA`
-- Change the device name on connect.ino if it will be running more deviced at the same time.
+- Change the device name on bluetooth.h if it will be running more deviced at the same time.
 - Commands can be sent over BLE to control the motor and servo.
 - Example Commands:
   - `on` → Turns the motor on

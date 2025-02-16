@@ -22,7 +22,6 @@ void initMotorPower(void) {
     pinMode(motorPin1, OUTPUT);
     pinMode(motorPin2, OUTPUT);
 
-    Serial.begin(115200); // Start serial communication
     Serial.println("Motor initialized.");
 }
 
