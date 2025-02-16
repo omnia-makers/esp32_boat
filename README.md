@@ -46,7 +46,17 @@ The application is structured as follows:
 | GND       | GND       |           |
 | 5V        | VCC       |           |
 
-### ESP32 to Servo Motor
+### ESP32 Mini C3 to L298N (Motor Driver)
+| ESP32 Pin | L298N Pin |   Motor   |
+|-----------|-----------|-----------|
+| GPIO 0    | IN1       | OUT1      |
+| GPIO 10   | IN2       | OUT2      |
+| GND       | GND       |           |
+| 5V        | VCC       |           |
+
+Change motorPin1 and motorPin2 on power.cpp if use ESP32 or ESP32Mini
+
+### ESP32 and ESP32Mini to Servo Motor
 | ESP32 Pin | Servo Pin  |
 |-----------|-----------|
 | GPIO 2    | Signal    |
