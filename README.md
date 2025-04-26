@@ -129,3 +129,9 @@ This client interface enables a seamless and interactive way to control the ESP3
 - The motor may require an external power source depending on its power consumption.
 - The servo, the H-bridge, and the ESP32 can be connected directly to the power supply, but the GND wire must also be connected to the GND of the ESP32.
 - The power supply must be between 5V and a maximum of 12V.
+
+## Problems
+
+### Esp32 mini the serial monitor does not shows any output
+
+On Arduino IDE - USB CDC On Boot: "Enabled"
