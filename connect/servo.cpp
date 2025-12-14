@@ -94,7 +94,7 @@ void Servo_Task(void *pvParameters)
   // Example mapping of angle to duty. Here the code is set up
   // to take angles from -254..254 → some duty range from 58..93, etc.
   // You can adjust these values to your servo or usage scenario.
-  uint16_t pulse_width = mapservo(Servo->Angle, -254, 254, 58, 93);
+  uint16_t pulse_width = mapservo(Servo->Angle, -254, 254, 26, 128);
 
   // For a 10-bit timer (0..1023), we might do:
   // duty = (pulse_width * 1024) / 2000, etc.
